@@ -1,3 +1,10 @@
+const\s+(.+?)\s+=\s+require\('(.+?)'\)
+import $1 from '$2';
+
+module\.exports\s+=\s+(.+)
+export default $1
+
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';

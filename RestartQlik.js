@@ -1,3 +1,31 @@
+const { PowerShell } = require('node-powershell');
+
+async function runTaskByName(taskName) {
+    const ps = new PowerShell();
+
+    try {
+        // Command to find the task by its name and run it
+        const command = `Get-ScheduledTask -TaskName "${taskName}" | Start-ScheduledTask`;
+
+        // Execute the PowerShell command
+        await ps.addCommand(command).invoke();
+
+        console.log(`Task '${taskName}' started successfully.`);
+    } catch (err) {
+        console.error('Error:', err);
+    } finally {
+        // Dispose PowerShell instance to release resources
+        ps.dispose();
+    }
+}
+
+// Usage example
+const taskName = 'YourTaskNameHere';
+runTaskByName(taskName);
+
+
+
+
 const express = require('express');
 const { exec } = require('child_process');
 const axios = require('axios');

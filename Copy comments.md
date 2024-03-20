@@ -1,3 +1,9 @@
+UPDATE your_table_name
+SET attributes = jsonb_set(attributes, '{title}', 'null', false)
+WHERE attributes ? 'title';
+
+
+
 import psycopg2
 import paramiko
 from sshtunnel import SSHTunnelForwarder

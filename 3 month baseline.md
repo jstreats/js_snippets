@@ -12,12 +12,14 @@ def connect_to_db(host, database, user, password):
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     return conn
 
-def export_db(ssh_client, db_name, export_file_path):
-    command = f"pg_dump {db_name} > {export_file_path}"
+def export_db(ssh_client, db_name, export_file_path, db_host, db_port, db_user, db_password):
+    # Constructing the command with credentials
+    command = f"PGPASSWORD='{db_password}' pg_dump -h {db_host} -p {db_port} -U {db_user} -d {db_name} -f {export_file_path}"
     stdout, stderr = run_ssh_command(ssh_client, command)
     if stderr:
         raise Exception(f"Error exporting database: {stderr}")
     print(f"Database {db_name} exported to {export_file_path}")
+
 
 def import_db(ssh_client, db_name, file_path, target_host, target_port, target_user, target_password):
     # If importing to a database on a different server, establish a new SSH connection
@@ -71,7 +73,7 @@ def main():
     ssh_client.connect(source_ssh_host, port=source_ssh_port, username=source_ssh_user, password=source_ssh_password)
     
     # Export database from source
-    export_db(ssh_client, source_db, export_file_path)
+    export_db(ssh_client, source_db, export_file_path, source_db_host, "4432", source_db_user, source_db_password)
     
     # Connect to target PostgreSQL if different, and optionally create a new database
     if target_db_host != source_db_host or target_db != source_db:

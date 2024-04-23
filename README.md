@@ -8,44 +8,35 @@ def generate_month_year_pairs():
     current_date = start_date
     while current_date <= end_date:
         yield current_date.year, current_date.month
-        # Move to the first day of the next month
         current_date += timedelta(days=31)
         current_date = current_date.replace(day=1)
 
-# Loop over each month and make an API call
+# Base URL of the API
+api_url = "https://qsctoreporting.uk.hsbc:7000"
+
+# Loop through each year and month
 for year, month in generate_month_year_pairs():
-    # Prepare the JSON body for the request
+    # JSON request body
     request_body = {
-        "dimensionList": ["Pod ID", "Month Year", "Incident Number $N"],
+        "dimensionList": ["Pod ID"],
         "measureList": ["API - Incidents"],
         "selections": [
-            {
-                "FieldName": "Year",
-                "Values": [str(year)],
-                "fieldType": "N"
-            },
-            {
-                "FieldName": "Month",
-                "Values": [str(month)],
-                "fieldType": "N"
-            }
+            {"FieldName": "Year", "Values": [str(year)], "fieldType": "N"},
+            {"FieldName": "Month", "Values": [str(month)], "fieldType": "N"}
         ]
     }
 
-    # API endpoint
-    api_endpoint = 'https://qsctoreporting.uk.hsbc:7000'
-
-    # Make the API call
-    response = requests.get(api_endpoint, json=request_body, verify=False)
+    # Make the GET request to the API
+    response = requests.get(api_url, json=request_body, verify=False)
     
-    # Check if the request was successful
     if response.status_code == 200:
-        # Save the response to a file
-        filename = f'api_response_{year}_{month:02d}.json'
-        with open(filename, 'w') as file:
+        # Parse the response and extract pod incident data
+        pod_incidents_data = response.json()  # Replace with the actual key if response is nested
+        # Save the extracted data to a file
+        file_name = f"pod_incidents_{year}_{month:02d}.json"
+        with open(file_name, "w") as file:
             file.write(response.text)
-        print(f'Successfully saved response for {year}-{month:02d}')
+        print(f"Data for {year}-{month:02d} saved successfully.")
     else:
-        print(f'Failed to fetch data for {year}-{month:02d}: {response.status_code}, Reason: {response.text}')
+        print(f"Failed to get data for {year}-{month:02d}: {response.status_code}")
 
-# If you're running this script in a production environment, consider removing verify=False and using a valid SSL certificate.

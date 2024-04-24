@@ -1,69 +1,71 @@
-import paramiko
-import psycopg2
-from psycopg2 import sql
+const express = require('express');
+const axios = require('axios');
+const { Pool } = require('pg');
+const cron = require('node-cron');
 
-# SSH connection details
-ssh_hostname = 'your_server_ip_or_hostname'
-ssh_username = 'SVC-QSDEVOPS-DEV'
-ssh_password = 'bfNb5C6EqoL491'
+const app = express();
+app.use(express.json());
 
-# Database connection details
-db_name = 'CXODashboard_db_dev'
-db_user = 'AutoQlik'
-db_password = 'AutoClick'
-db_host = 'localhost'  # localhost since we are already connected via SSH
-db_port = '4432'
+const pool = new Pool({
+  user: 'AutoQlik',
+  host: 'localhost',
+  database: 'CXODashboard_db_dev',
+  password: 'AutoClick',
+  port: 4432,
+});
 
-def create_ssh_tunnel():
-    # Create an SSH client
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(ssh_hostname, username=ssh_username, password=ssh_password)
-    return client
+const createTables = async () => {
+  const queries = `
+    CREATE TABLE IF NOT EXISTS api_responses (
+      id SERIAL PRIMARY KEY,
+      api_endpoint VARCHAR(255),
+      response JSON,
+      call_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS scheduled_tasks (
+      id SERIAL PRIMARY KEY,
+      endpoint VARCHAR(255),
+      cron_date VARCHAR(255)
+    );
+  `;
+  await pool.query(queries);
+};
 
-def connect_database():
-    conn = psycopg2.connect(
-        dbname=db_name,
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        port=db_port
-    )
-    return conn
+const callApiAndSave = async (endpoint) => {
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  const toDate = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
 
-def update_tables_default(conn):
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-        tables = cursor.fetchall()
+  try {
+    const response = await axios.get(`${endpoint}?toDate=${toDate}`);
+    const insertQuery = 'INSERT INTO api_responses (api_endpoint, response) VALUES ($1, $2)';
+    await pool.query(insertQuery, [endpoint, response.data]);
+    console.log(`Data saved for ${endpoint}`);
+  } catch (error) {
+    console.error(`Error calling API for ${endpoint}: ${error.message}`);
+  }
+};
 
-        for (table,) in tables:
-            cursor.execute(
-                sql.SQL("SELECT column_name FROM information_schema.columns WHERE table_name = %s AND column_name = 'updated_on'"),
-                [table]
-            )
-            result = cursor.fetchone()
-            if result:
-                # Modify the default value of 'updated_on'
-                query = sql.SQL("ALTER TABLE {} ALTER COLUMN updated_on SET DEFAULT CURRENT_TIMESTAMP").format(sql.Identifier(table))
-                cursor.execute(query)
-                print(f"Updated default value for 'updated_on' in {table}")
+const initializeScheduledTasks = async () => {
+  const selectQuery = 'SELECT * FROM scheduled_tasks';
+  const { rows } = await pool.query(selectQuery);
+  rows.forEach(row => {
+    cron.schedule(row.cron_date, () => callApiAndSave(row.endpoint));
+  });
+};
 
-    conn.commit()
+app.post('/schedule-api', async (req, res) => {
+  const { endpoint, dates } = req.body;
+  const insertQuery = 'INSERT INTO scheduled_tasks (endpoint, cron_date) VALUES ($1, $2)';
+  dates.forEach(async date => {
+    await pool.query(insertQuery, [endpoint, date]);
+    cron.schedule(`0 0 1 ${date} *`, () => callApiAndSave(endpoint));
+  });
+  res.send('Scheduled API calls successfully.');
+});
 
-def main():
-    client = create_ssh_tunnel()
-    print("SSH connection established.")
-
-    try:
-        conn = connect_database()
-        print("Database connection established.")
-        
-        update_tables_default(conn)
-        print("Tables updated successfully.")
-
-    finally:
-        conn.close()
-        client.close()
-
-if __name__ == '__main__':
-    main()
+app.listen(3000, async () => {
+  console.log('Server running on http://localhost:3000');
+  await createTables();
+  await initializeScheduledTasks();
+});

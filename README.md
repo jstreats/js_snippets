@@ -1,34 +1,48 @@
+import requests
+import time
+import json
 
-const getProvisionalNumberLastUpdateDate = async (tableName, maxDate = moment().format('YYYY-MM-DD')) => {
-  try {
-
-    const selectedMonth = moment(maxDate).month(); // zero-based month index
-    const query = `
-      SELECT MAX(updated_on) AS provisionalNumberLastUpdateDate
-      FROM ${tableName}
-      WHERE updated_on <= $1;
-    `;
-
-    const { rows } = await pool.query(query, [maxDate]);
-    const provisionalNumberLastUpdateDate = rows[0].provisionalNumberLastUpdateDate;
-
-    if (!provisionalNumberLastUpdateDate) {
-      return { provisionalNumberLastUpdateDate: null, isProvisionalMetric: false };
+# Function to make a GET request to the primary API
+def make_request():
+    url = "https://api.example.com/data"  # Replace with the actual URL
+    headers = {'Content-Type': 'application/json'}
+    body = {
+        "dimensionList": ["Month Year"],
+        "measureList": [],
+        "selections": [
+            {
+                "FieldName": "Year",
+                "Values": [2024],
+                "fieldType": "N"
+            },
+            {
+                "FieldName": "Month",
+                "Values": [1],
+                "fieldType": "N"
+            }
+        ]
     }
+    try:
+        response = requests.get(url, headers=headers, json=body, verify=False)
+        response.raise_for_status()
+        print("Request successful, response:", response.text)
+    except requests.RequestException as e:
+        print("Error during the API call:", e)
+        call_error_handling_api()
 
-    const dateOfProvisional = moment(provisionalNumberLastUpdateDate);
-    const isProvisionalMetric = dateOfProvisional.date() < 5 && dateOfProvisional.month() === selectedMonth;
+# Function to call another API when an error occurs
+def call_error_handling_api():
+    url = "https://api.example.com/error-handler"  # Replace with the actual URL
+    try:
+        response = requests.post(url, data={"message": "Error in primary API"}, verify=False)
+        print("Error handling API called successfully, status code:", response.status_code)
+    except requests.RequestException as e:
+        print("Error during the error handling API call:", e)
 
-    return { 
-      provisionalNumberLastUpdateDate: provisionalNumberLastUpdateDate,
-      isProvisionalMetric
-    };
-  } catch (error) {
-    console.error("Error querying database", error);
-    throw error;
-  }
-};
-
+# Main loop to run the function every 1 minute
+while True:
+    make_request()
+    time.sleep(60)  # Wait for 1 minute before making the next request
 
 
 

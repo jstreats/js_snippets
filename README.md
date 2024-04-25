@@ -1,64 +1,33 @@
-app.get('/api-logs', async (req, res) => {
+
+const getProvisionalNumberLastUpdateDate = async (tableName, maxDate = moment().format('YYYY-MM-DD')) => {
   try {
-    const result = await pool.query('SELECT * FROM api_responses ORDER BY call_date DESC');
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Failed to fetch API logs:', error);
-    res.status(500).send('Failed to fetch API logs');
-  }
-});
 
+    const selectedMonth = moment(maxDate).month(); // zero-based month index
+    const query = `
+      SELECT MAX(updated_on) AS provisionalNumberLastUpdateDate
+      FROM ${tableName}
+      WHERE updated_on <= $1;
+    `;
 
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+    const { rows } = await pool.query(query, [maxDate]);
+    const provisionalNumberLastUpdateDate = rows[0].provisionalNumberLastUpdateDate;
 
-const API_BASE_URL = 'http://localhost:3000'; // Configure this as needed
+    if (!provisionalNumberLastUpdateDate) {
+      return { provisionalNumberLastUpdateDate: null, isProvisionalMetric: false };
+    }
 
-function ApiLogs() {
-  const [logs, setLogs] = useState([]);
+    const dateOfProvisional = moment(provisionalNumberLastUpdateDate);
+    const isProvisionalMetric = dateOfProvisional.date() < 5 && dateOfProvisional.month() === selectedMonth;
 
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/api-logs`);
-        setLogs(response.data);
-      } catch (error) {
-        console.error('Failed to fetch API logs', error);
-      }
+    return { 
+      provisionalNumberLastUpdateDate: provisionalNumberLastUpdateDate,
+      isProvisionalMetric
     };
-
-    fetchLogs();
-  }, []);
-
-  return (
-    <div className="container mt-3">
-      <h2>API Logs</h2>
-      <table className="table table-striped">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Endpoint</th>
-            <th>Response</th>
-            <th>Call Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map(log => (
-            <tr key={log.id}>
-              <td>{log.id}</td>
-              <td>{log.api_endpoint}</td>
-              <td><pre>{JSON.stringify(log.response, null, 2)}</pre></td>
-              <td>{new Date(log.call_date).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-export default ApiLogs;
-
+  } catch (error) {
+    console.error("Error querying database", error);
+    throw error;
+  }
+};
 
 
 

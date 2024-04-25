@@ -1,107 +1,67 @@
-import React, { useState, useEffect } from 'react';
+app.get('/api-logs', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM api_responses ORDER BY call_date DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Failed to fetch API logs:', error);
+    res.status(500).send('Failed to fetch API logs');
+  }
+});
+
+
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000'; // You can configure this as needed
+const API_BASE_URL = 'http://localhost:3000'; // Configure this as needed
 
-function ScheduleList() {
-  const [schedules, setSchedules] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+function ApiLogs() {
+  const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    fetchSchedules();
+    const fetchLogs = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api-logs`);
+        setLogs(response.data);
+      } catch (error) {
+        console.error('Failed to fetch API logs', error);
+      }
+    };
+
+    fetchLogs();
   }, []);
 
-  const fetchSchedules = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/list-schedules`);
-      setSchedules(response.data);
-    } catch (error) {
-      console.error('Failed to fetch schedules', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (selectedId) {
-      try {
-        await axios.delete(`${API_BASE_URL}/unschedule-api/${selectedId}`);
-        setShowModal(false); // Close modal
-        fetchSchedules(); // Refresh the list after deletion
-        alert('Schedule deleted successfully');
-      } catch (error) {
-        console.error('Failed to delete schedule', error);
-      }
-    }
-  };
-
-  const openModal = (id) => {
-    setSelectedId(id);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-  };
-
   return (
-    <div>
-      <h2>Scheduled API Calls</h2>
-      <table className="table">
+    <div className="container mt-3">
+      <h2>API Logs</h2>
+      <table className="table table-striped">
         <thead>
           <tr>
             <th>ID</th>
             <th>Endpoint</th>
-            <th>Date</th>
-            <th>Action</th>
+            <th>Response</th>
+            <th>Call Date</th>
           </tr>
         </thead>
         <tbody>
-          {schedules.map(schedule => (
-            <tr key={schedule.id}>
-              <td>{schedule.id}</td>
-              <td>{schedule.endpoint}</td>
-              <td>{schedule.cron_date}</td>
-              <td>
-                <button className="btn btn-danger" onClick={() => openModal(schedule.id)}>
-                  Delete
-                </button>
-              </td>
+          {logs.map(log => (
+            <tr key={log.id}>
+              <td>{log.id}</td>
+              <td>{log.api_endpoint}</td>
+              <td><pre>{JSON.stringify(log.response, null, 2)}</pre></td>
+              <td>{new Date(log.call_date).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      {showModal && (
-        <div className="modal show" tabIndex="-1" style={{ display: 'block' }} role="dialog">
-          <div className="modal-dialog" role="document">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Delete Schedule</h5>
-                <button type="button" className="close" onClick={closeModal}>
-                  <span aria-hidden="true">&times;</span>
-                </button>
-              </div>
-              <div className="modal-body">
-                <p>Are you sure you want to delete this schedule?</p>
-              </div>
-              <div className="modal-backdrop" onClick={closeModal}></div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                  Close
-                </button>
-                <button type="button" className="btn btn-danger" onClick={handleDelete}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-export default ScheduleList;
+export default ApiLogs;
+
+
+
+
 
 
 

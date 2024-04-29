@@ -1,49 +1,42 @@
-import requests
-import time
-import json
 
-# Function to make a GET request to the primary API
-def make_request():
-    url = "https://api.example.com/data"  # Replace with the actual URL
-    headers = {'Content-Type': 'application/json'}
-    body = {
-        "dimensionList": ["Month Year"],
-        "measureList": [],
-        "selections": [
-            {
-                "FieldName": "Year",
-                "Values": [2024],
-                "fieldType": "N"
-            },
-            {
-                "FieldName": "Month",
-                "Values": [1],
-                "fieldType": "N"
+async function fetchProvisionalNumberLastUpdateDate(tables, maxDate = moment().toDate()) {
+    const client = await pool.connect();
+    try {
+        let provisionalNumberLastUpdateDate = null;
+
+        // Loop through each table and find the maximum `updated_on` date less than or equal to `maxDate`
+        for (let table of tables) {
+            const query = `
+                SELECT MAX(updated_on) AS max_updated_on
+                FROM ${table}
+                WHERE updated_on <= $1;
+            `;
+            const res = await client.query(query, [maxDate]);
+            const maxDateForTable = res.rows[0].max_updated_on;
+            if (maxDateForTable && (!provisionalNumberLastUpdateDate || maxDateForTable > provisionalNumberLastUpdateDate)) {
+                provisionalNumberLastUpdateDate = maxDateForTable;
             }
-        ]
+        }
+
+        if (!provisionalNumberLastUpdateDate) {
+            return { provisionalNumberLastUpdateDate: null, isProvisionalMetric: false };
+        }
+
+        // Convert `provisionalNumberLastUpdateDate` to moment object and extract the month
+        const selectedMonth = moment(provisionalNumberLastUpdateDate).month() + 1;  // month() returns 0 to 11
+
+        // Check if date is before the 5th of the selected month
+        const isProvisionalMetric = moment(provisionalNumberLastUpdateDate).date() < 5;
+
+        return {
+            provisionalNumberLastUpdateDate,
+            isProvisionalMetric,
+            selectedMonth
+        };
+    } finally {
+        client.release();
     }
-    try:
-        response = requests.get(url, headers=headers, json=body, verify=False)
-        response.raise_for_status()
-        print("Request successful, response:", response.text)
-    except requests.RequestException as e:
-        print("Error during the API call:", e)
-        call_error_handling_api()
-
-# Function to call another API when an error occurs
-def call_error_handling_api():
-    url = "https://api.example.com/error-handler"  # Replace with the actual URL
-    try:
-        response = requests.post(url, data={"message": "Error in primary API"}, verify=False)
-        print("Error handling API called successfully, status code:", response.status_code)
-    except requests.RequestException as e:
-        print("Error during the error handling API call:", e)
-
-# Main loop to run the function every 1 minute
-while True:
-    make_request()
-    time.sleep(60)  # Wait for 1 minute before making the next request
-
+}
 
 
 

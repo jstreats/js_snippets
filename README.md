@@ -89,3 +89,64 @@ app.get('/metrics', async (req, res) => {
 });
 
 
+const axios = require('axios');
+
+// Endpoint to load data into the DB
+app.post('/load-data', async (req, res) => {
+    try {
+        // Fetch reporting cuts from the external API
+        const reportingCutsResponse = await axios.get('http://externalapi.com/reporting-cuts');
+        const reportingCuts = reportingCutsResponse.data;
+
+        for (let cut of reportingCuts) {
+            // Check if data for this reporting cut is already in the DB
+            const existsQuery = 'SELECT EXISTS (SELECT 1 FROM metrics WHERE date_of_reporting = $1)';
+            const { rows } = await pool.query(existsQuery, [cut]);
+
+            if (!rows[0].exists) {
+                // If data is not present, fetch data for each level
+                const levels = ['multi_gbgf', 'gbgf', 'service_line'];
+                for (let level of levels) {
+                    const levelDataResponse = await axios.get(`http://anotherapi.com/data/${level}/${cut}`);
+                    const records = levelDataResponse.data.data; // assuming the response has a "data" key containing records
+
+                    for (let record of records) {
+                        // Insert each record in the metrics table
+                        const insertMetricsQuery = `
+                            INSERT INTO metrics (metric_name, value, date_of_reporting, month_year, level, level_id)
+                            VALUES ($1, $2, $3, $4, $5, $6)
+                            ON CONFLICT DO NOTHING;
+                        `;
+                        await pool.query(insertMetricsQuery, [
+                            record.metric_name,
+                            record.value,
+                            cut,
+                            record.month_year,
+                            level,
+                            record.level_id
+                        ]);
+
+                        // Check and insert new GBGF or SL
+                        if (level !== 'multi_gbgf') {
+                            const insertStructureQuery = `
+                                INSERT INTO organizational_structure (name, parent_id, level_type)
+                                VALUES ($1, $2, $3)
+                                ON CONFLICT (name) DO NOTHING;
+                            `;
+                            await pool.query(insertStructureQuery, [
+                                record.name,
+                                record.parent_id,
+                                level
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
+
+        res.status(200).send('Data loading completed successfully.');
+    } catch (error) {
+        console.error('Failed to load data:', error);
+        res.status(500).send('Failed to load data.');
+    }
+});

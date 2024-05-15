@@ -1,3 +1,13 @@
+Hi Robert,
+
+I hope this email finds you well. We have been integrating the latest Vision27 data into our dashboard and noticed that the metric IDs for some metrics have been updated. Unfortunately, these changes were not communicated to us in advance, and it has caused some integration issues, particularly with the development of our commentary system.
+
+Could you please confirm the final metric IDs for the updated metrics? Also, for future updates, could we set up a process to communicate such changes beforehand? This will greatly help in managing dependencies and ensuring smooth updates to our systems.
+
+
+
+
+
 CREATE TABLE IF NOT EXISTS organizational_structure (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,

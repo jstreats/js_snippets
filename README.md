@@ -1,10 +1,21 @@
-Hi Robert,
+const checkQuery = `
+            SELECT id FROM organizational_structure
+            WHERE name = $1 AND level_type = $2 AND ($3 IS NULL OR parent_id = $3);
+        `;
+        const checkRes = await pool.query(checkQuery, [record.name, level, record.parent_id]);
 
-I hope this email finds you well. We have been integrating the latest Vision27 data into our dashboard and noticed that the metric IDs for some metrics have been updated. Unfortunately, these changes were not communicated to us in advance, and it has caused some integration issues, particularly with the development of our commentary system.
-
-Could you please confirm the final metric IDs for the updated metrics? Also, for future updates, could we set up a process to communicate such changes beforehand? This will greatly help in managing dependencies and ensuring smooth updates to our systems.
-
-
+        // Insert new organizational structure if not exists
+        if (checkRes.rowCount === 0) {
+            const insertStructureQuery = `
+                INSERT INTO organizational_structure (name, parent_id, level_type)
+                VALUES ($1, $2, $3)
+                RETURNING id;
+            `;
+            const structureRes = await pool.query(insertStructureQuery, [record.name, record.parent_id, level]);
+            record.level_id = structureRes.rows[0].id; // update level_id with newly created id
+        } else {
+            record.level_id = checkRes.rows[0].id; // existing id
+        }
 
 
 

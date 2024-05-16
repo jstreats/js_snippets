@@ -1,22 +1,61 @@
-const checkQuery = `
-            SELECT id FROM organizational_structure
-            WHERE name = $1 AND level_type = $2 AND ($3 IS NULL OR parent_id = $3);
-        `;
-        const checkRes = await pool.query(checkQuery, [record.name, level, record.parent_id]);
+let parentId = null;  // Default parent ID is null
 
-        // Insert new organizational structure if not exists
+        // Check and insert parent if not 'multi_gbgf' and parent name is provided
+        if (level !== 'multi_gbgf' && record.parent_name) {
+            const parentCheckQuery = `
+                SELECT id FROM organizational_structure
+                WHERE name = $1 AND level_type = $2;
+            `;
+            const parentType = level === 'gbgf' ? 'multi_gbgf' : 'gbgf'; // Determine parent level based on current level
+            const parentCheckRes = await pool.query(parentCheckQuery, [record.parent_name, parentType]);
+
+            if (parentCheckRes.rowCount === 0) {
+                const insertParentQuery = `
+                    INSERT INTO organizational_structure (name, parent_id, level_type)
+                    VALUES ($1, NULL, $2)
+                    RETURNING id;
+                `;
+                const parentInsertRes = await pool.query(insertParentQuery, [record.parent_name, parentType]);
+                parentId = parentInsertRes.rows[0].id;
+            } else {
+                parentId = parentCheckRes.rows[0].id;
+            }
+        }
+
+        // Check if the current node exists
+        const checkQuery = `
+            SELECT id FROM organizational_structure
+            WHERE name = $1 AND level_type = $2 AND parent_id = $3;
+        `;
+        const checkRes = await pool.query(checkQuery, [record.name, level, parentId]);
+
+        // Insert new node if not exists
         if (checkRes.rowCount === 0) {
             const insertStructureQuery = `
                 INSERT INTO organizational_structure (name, parent_id, level_type)
                 VALUES ($1, $2, $3)
                 RETURNING id;
             `;
-            const structureRes = await pool.query(insertStructureQuery, [record.name, record.parent_id, level]);
-            record.level_id = structureRes.rows[0].id; // update level_id with newly created id
+            const structureRes = await pool.query(insertStructureQuery, [record.name, parentId, level]);
+            record.level_id = structureRes.rows[0].id; // Update level_id with newly created id
         } else {
-            record.level_id = checkRes.rows[0].id; // existing id
+            record.level_id = checkRes.rows[0].id; // Use existing id
         }
 
+        // Insert each record in the metrics table
+        const insertMetricsQuery = `
+            INSERT INTO metrics (metric_name, value, date_of_reporting, month_year, level, level_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT DO NOTHING;
+        `;
+        await pool.query(insertMetricsQuery, [
+            record.metric_name,
+            record.value,
+            cut,
+            record.month_year,
+            level,
+            record.level_id
+        ]);
 
 
 CREATE TABLE IF NOT EXISTS organizational_structure (

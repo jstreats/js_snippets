@@ -1,4 +1,26 @@
-["qHyperCubeDef"]["qDimensions"].append({"qDef": {"qFieldDefs": [sort_by]}, "qSortCriterias": [{"qSortByAscii": 1}]})
+function sortByMonthYear(obj) {
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  const sortedKeys = Object.keys(obj).sort((a, b) => {
+    const [aMonth, aYear] = a.split(' ');
+    const [bMonth, bYear] = b.split(' ');
+
+    const aDate = new Date(`${aMonth} 1, ${aYear}`);
+    const bDate = new Date(`${bMonth} 1, ${bYear}`);
+
+    return aDate - bDate;
+  });
+
+  const sortedObj = {};
+  for (const key of sortedKeys) {
+    sortedObj[key] = obj[key];
+  }
+
+  return sortedObj;
+}
+
+
+
 let parentId = null;  // Default parent ID is null
 
         // Check and insert parent if not 'multi_gbgf' and parent name is provided

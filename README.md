@@ -1,3 +1,4 @@
+["qHyperCubeDef"]["qDimensions"].append({"qDef": {"qFieldDefs": [sort_by]}, "qSortCriterias": [{"qSortByAscii": 1}]})
 let parentId = null;  // Default parent ID is null
 
         // Check and insert parent if not 'multi_gbgf' and parent name is provided

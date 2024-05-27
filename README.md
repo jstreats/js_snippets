@@ -1,40 +1,33 @@
+// Utility function to parse Mon-YY format
+const parseMonthYear = (monthYear) => {
+    return moment(monthYear, 'MMM-YY', true).isValid() ? moment(monthYear, 'MMM-YY') : null;
+};
 
-CREATE TABLE IF NOT EXISTS changelog (
-    updateDate DATE NOT NULL,
-    description TEXT NOT NULL,
-    PRIMARY KEY (updateDate, description)
-);
-
-app.get('/changelog', async (req, res) => {
+// API to get the latest month_year in Mon-YY format
+app.get('/latest-month-year', async (req, res) => {
     try {
+        const today = moment().format('MMM-YY');
+
         const result = await pool.query(`
-            SELECT TO_CHAR(updateDate, 'YYYY-MM-DD') AS updateDate, array_agg(description) AS descriptionList
-            FROM changelog
-            GROUP BY updateDate
-            ORDER BY updateDate DESC
+            SELECT month_year 
+            FROM vision_27 
+            WHERE month_year ~ '^[A-Za-z]{3}-\\d{2}$'
         `);
 
-        const summary = result.rows.map(row => ({
-            updateDate: row.updatedate,
-            descriptionList: row.descriptionlist
-        }));
+        const validEntries = result.rows
+            .map(row => row.month_year)
+            .map(parseMonthYear)
+            .filter(date => date && date.isSameOrBefore(moment(today, 'MMM-YY')))
+            .sort((a, b) => b - a);
 
-        res.json({ summary });
+        const latestMonthYear = validEntries.length > 0 ? validEntries[0].format('MMM-YY') : null;
+
+        res.json({ latestMonthYear });
     } catch (error) {
         console.error(error);
         res.status(500).send('Server error');
     }
 });
-
-
-INSERT INTO changelog (updateDate, description) VALUES
-('2024-05-08', 'CIO Performance Summary data is updated for April 2024.'),
-('2024-05-08', 'Inventory data is uploaded for March 2024.'),
-('2024-05-08', 'April 2024 data is available on OKR Dashboard.'),
-('2024-05-16', 'Commentary is enabled for Vision 27 Dashboard.'),
-('2024-05-16', 'What''s New feature rollout from CXO. It shows the latest features and updates rollout on the CXO dashboard.');
-
-
 
 
 

@@ -1,3 +1,14 @@
+function isPackageAvailable(packageName) {
+  try {
+    require.resolve(packageArguments);
+    return true; // The package is installed and can be resolved
+  } catch (error) {
+    return false; // The package is not installed
+  }
+}
+
+
+
 // Utility function to parse Mon-YY format
 const parseMonthYear = (monthYear) => {
     return moment(monthYear, 'MMM-YY', true).isValid() ? moment(monthYear, 'MMM-YY') : null;

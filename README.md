@@ -33,7 +33,24 @@ INSERT INTO metric_values (org_id, metric_id, month_year, value, dimensions, val
 (4, 3, '2024-06-01', 3, '{"environment": "production"}', 'actual'),
 (4, 4, '2024-06-01', 3.5, '{"environment": "production"}', 'actual');
 
-![Uploading image.png…]()
+
+
+INSERT INTO org_details (org_name, level) VALUES
+('Application Management Team', 'org level 8'),
+('DevOps Team', 'org level 8'),
+('Quality Assurance Team', 'org level 8'),
+('Security Compliance Team', 'org level 8'),
+('Infrastructure Team', 'org level 8'),
+('Project Management Office', 'org level 8');
+-- Link these org level 8 teams to their parent SLs or GBGFs (using assumed parent_org_ids from previous examples)
+INSERT INTO org_hierarchy (org_id, parent_org_id) VALUES
+(7, 3),  -- Application Management Team under GPBW and AMG IT
+(8, 3),  -- DevOps Team under GPBW and AMG IT
+(9, 6),  -- Quality Assurance Team under Finance Technology
+(10, 6), -- Security Compliance Team under Finance Society
+(11, 5), -- Infrastructure Team under Cross Functions Technology
+(12, 5); -- Project Management Office under Cross Functions Technology
+
 
 
 

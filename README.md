@@ -1,3 +1,23 @@
+app.get('/api/orgHierarchy', async (req, res) => {
+    try {
+        const result = await db.query("SELECT * FROM get_org_hierarchy();");
+        res.status(200).json(result.rows);
+    } catch (error) {
+        res.status(500).send('Server error occurred: ' + error.message);
+    }
+});
+
+app.get('/api/metricHierarchy/:startMetricId?', async (req, res) => {
+    const { startMetricId } = req.params;
+    try {
+        const result = await db.query("SELECT * FROM get_metric_hierarchy($1);", [startMetricId || null]);
+        res.status(200).json(result.rows);
+    } catch (error) {
+        res.status(500).send('Server error occurred: ' + error.message);
+    }
+});
+
+
 
 CREATE TABLE org_details (
     org_id SERIAL PRIMARY KEY,
@@ -44,106 +64,182 @@ CREATE TABLE metric_values (
     FOREIGN KEY (metric_id) REFERENCES metric_details (metric_id)
 );
 
+-- Indexes
+CREATE INDEX idx_org_hierarchy_org_id ON org_hierarchy (org_id) WHERE soft_deleted = FALSE ;
+CREATE INDEX idx_org_hierarchy_parent_org_id ON org_hierarchy (parent_org_id) WHERE soft_deleted = FALSE;
+CREATE INDEX idx_metric_values_org_id ON metric_values (org_id)  WHERE soft_deleted = FALSE;
+CREATE INDEX idx_metric_values_metric_id ON metric_values (metric_id);
+CREATE INDEX idx_metric_values_composite ON metric_values (org_id, month_year, value_type);
+CREATE INDEX idx_metric_values_last_updated ON metric_values (last_updated);
+CREATE INDEX idx_metric_values_actual ON metric_values (org_id, metric_id, month_year) WHERE value_type = 'actual';
+CREATE INDEX idx_metric_values_soft_deleted ON metric_values (soft_deleted);
+CREATE INDEX idx_org_details_org_name ON org_details (org_name);
+CREATE INDEX idx_metric_values_org_metric_date ON metric_values (org_id, metric_id, month_year);
+CREATE INDEX idx_metric_values_dimensions ON metric_values USING gin (dimensions);
+
+CREATE INDEX idx_metric_details_metric_name ON metric_details (metric_name);
+
+-- Views
+CREATE VIEW vw_org_hierarchy AS
+SELECT child.org_id, child.parent_org_id, child.level , parent.org_name AS parent_name, child.org_name
+FROM org_hierarchy AS child
+JOIN org_details AS parent ON child.parent_org_id = parent.org_id 
+JOIN org_details AS child_detail ON child.org_id = child_detail.org_id 
+WHERE child.soft_deleted = FALSE;
+
+CREATE VIEW vw_latest_metric_values AS
+SELECT m.metric_id, m.metric_name, v.org_id, v.month_year, v.value, v.dimensions, v.value_type
+FROM metric_values v
+JOIN metric_details m ON v.metric_id = m.metric_id
+WHERE v.soft_deleted = FALSE AND m.soft_deleted = FALSE
+AND (v.org_id, v.metric_id, v.month_year, v.last_updated) IN (
+    SELECT org_id, metric_id, month_year, MAX(last_updated)
+    FROM metric_values
+    WHERE soft_deleted = FALSE
+    GROUP BY org_id, metric_id, month_year
+);
 
 
+--Functions
+CREATE OR REPLACE FUNCTION update_metric_value(p_org_id INT, p_metric_id INT, p_month_year DATE, p_value NUMERIC, p_dimensions JSON, p_value_type VARCHAR)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE metric_values
+    SET value = p_value, last_updated = CURRENT_TIMESTAMP, soft_deleted = FALSE
+    WHERE org_id = p_org_id AND metric_id = p_metric_id AND month_year = p_month_year AND dimensions @> p_dimensions AND dimensions <@ p_dimensions AND value_type = p_value_type AND soft_deleted = FALSE;
+
+    IF NOT FOUND THEN
+        INSERT INTO metric_values (org_id, metric_id, month_year, value, dimensions, value_type)
+        VALUES (p_org_id, p_metric_id, p_month_year, p_value, p_dimensions, p_value_type)
+        ON CONFLICT (org_id, metric_id, month_year, dimensions, value_type)
+        DO UPDATE SET value = EXCLUDED.value, last_updated = CURRENT_TIMESTAMP;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION add_or_update_hierarchy(child_org_name VARCHAR, parent_org_name VARCHAR, child_level VARCHAR, parent_level VARCHAR)
+RETURNS VOID AS $$
+DECLARE
+    child_org_id INT;
+    parent_org_id INT;
+BEGIN
+    -- Check and insert child org if it does not exist or is soft-deleted
+    SELECT org_id INTO child_org_id FROM org_details WHERE org_name = child_org_name AND soft_deleted = FALSE;
+    IF child_org_id IS NULL THEN
+        INSERT INTO org_details (org_name, level ) VALUES (child_org_name, child_level) RETURNING org_id INTO child_org_id;
+    END IF;
+
+    -- Check and insert parent org if it does not exist or is soft-deleted
+    SELECT org_id INTO parent_org_id FROM org_details WHERE org_name = parent_org_name AND soft_deleted = FALSE;
+    IF parent_org_id IS NULL THEN
+        INSERT INTO org_details (org_name, level ) VALUES (parent_org_name, parent_level) RETURNING org_id INTO parent_org_id;
+    END IF;
+
+    -- Insert or update hierarchy
+    INSERT INTO org_hierarchy (org_id, parent_org_id)
+    VALUES (child_org_id, parent_org_id)
+    ON CONFLICT (org_id) 
+    DO UPDATE SET parent_org_id = EXCLUDED.parent_org_id;
+END;
+$$ LANGUAGE plpgsql;
 
 
+CREATE OR REPLACE FUNCTION get_org_hierarchy()
+RETURNS TABLE(org_id INT, parent_org_id INT, org_name VARCHAR, parent_name VARCHAR, depth INT) AS $$
+BEGIN
+    RETURN QUERY
+    WITH RECURSIVE hierarchy_path AS (
+        SELECT h.org_id, h.parent_org_id, d.org_name, pd.org_name AS parent_name, 1 AS depth
+        FROM org_hierarchy h
+        JOIN org_details d ON h.org_id = d.org_id AND d.level = 'gbgf' AND d.soft_deleted = FALSE
+        LEFT JOIN org_details pd ON h.parent_org_id = pd.org_id AND pd.soft_deleted = FALSE
+        WHERE h.soft_deleted = FALSE
+        UNION ALL
+        SELECT h.org_id, h.parent_org_id, d.org_name, p.parent_name, p.depth + 1
+        FROM org_hierarchy h
+        JOIN hierarchy_path p ON p.org_id = h.parent_org_id
+        JOIN org_details d ON h.org_id = d.org_id AND d.soft_deleted = FALSE
+        WHERE h.soft_deleted = FALSE
+    )
+    SELECT org_id, parent_org_id, org_name, parent_name, depth FROM hierarchy_path;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_org_metrics(
+    p_org_id INT,
+    p_metric_names TEXT[],
+    p_start_month DATE,
+    p_end_month DATE,
+    p_value_types VARCHAR[],
+    p_dimensions JSONB
+)
+RETURNS TABLE(org_id INT, metric_id INT, metric_name VARCHAR, month_year DATE, value NUMERIC, dimensions JSONB, value_type VARCHAR) AS $$
+BEGIN
+    RETURN QUERY
+    WITH RECURSIVE org_hierarchy_recursive AS (
+        -- Start with the initial organization and recursively find all child organizations
+        SELECT org_id, parent_org_id
+        FROM org_hierarchy
+        WHERE org_id = p_org_id AND soft_deleted = FALSE
+        UNION ALL
+        SELECT h.org_id, h.parent_org_id
+        FROM org_hierarchy h
+        JOIN org_hierarchy_recursive hr ON h.parent_org_id = hr.org_id
+        WHERE h.soft_deleted = FALSE
+    ),
+    filtered_metrics AS (
+        -- Join the metrics details table to filter metrics by names if provided
+        SELECT md.metric_id, md.metric_name
+        FROM metric_details md
+        WHERE (p_metric_names IS NULL OR md.metric_name = ANY(p_metric_names)) AND md.soft_deleted = FALSE
+    )
+    SELECT mv.org_id, mv.metric_id, fm.metric_name, mv.month_year, mv.value, mv.dimensions, mv.value_type
+    FROM metric_values mv
+    JOIN org_hierarchy_recursive ohr ON mv.org_id = ohr.org_id
+    JOIN filtered_metrics fm ON mv.metric_id = fm.metric_id
+    WHERE
+        mv.month_year BETWEEN p_start_month AND p_end_month
+        AND (p_value_types IS NULL OR mv.value_type = ANY(p_value_types))
+        AND (p_dimensions IS NULL OR (mv.dimensions @> p_dimensions AND mv.dimensions <@ p_dimensions))
+        AND mv.soft_deleted = FALSE
+    ORDER BY mv.org_id, mv.metric_id, mv.month_year;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_metric_hierarchy(start_metric_id INT DEFAULT NULL)
+RETURNS TABLE(
+    metric_id INT,
+    parent_metric_id INT,
+    metric_name VARCHAR,
+    level INT
+) LANGUAGE plpgsql AS $$
+BEGIN
+    RETURN QUERY
+    WITH RECURSIVE metric_hierarchy AS (
+        -- Base case: Select the root node or a specific starting node
+        SELECT 
+            metric_id,
+            parent_metric_id,
+            metric_name,
+            1 AS level
+        FROM metric_details
+        WHERE 
+            (metric_id = start_metric_id OR start_metric_id IS NULL) AND
+            (parent_metric_id IS NULL OR start_metric_id IS NOT NULL)
+
+        UNION ALL
+
+        -- Recursive step: Select child nodes
+        SELECT 
+            md.metric_id,
+            md.parent_metric_id,
+            md.metric_name,
+            mh.level + 1
+        FROM metric_details md
+        JOIN metric_hierarchy mh ON mh.metric_id = md.parent_metric_id
+    )
+    SELECT * FROM metric_hierarchy;
+END;
+$$;
 
 
-
-
-// Utility function to parse Mon-YY format
-const parseMonthYear = (monthYear) => {
-    return moment(monthYear, 'MMM-YY', true).isValid() ? moment(monthYear, 'MMM-YY') : null;
-};
-
-// API to get the latest month_year in Mon-YY format
-app.get('/latest-month-year', async (req, res) => {
-    try {
-        const today = moment().format('MMM-YY');
-
-        const result = await pool.query(`
-            SELECT month_year 
-            FROM vision_27 
-            WHERE month_year ~ '^[A-Za-z]{3}-\\d{2}$'
-        `);
-
-        const validEntries = result.rows
-            .map(row => row.month_year)
-            .map(parseMonthYear)
-            .filter(date => date && date.isSameOrBefore(moment(today, 'MMM-YY')))
-            .sort((a, b) => b - a);
-
-        const latestMonthYear = validEntries.length > 0 ? validEntries[0].format('MMM-YY') : null;
-
-        res.json({ latestMonthYear });
-    } catch (error) {
-        console.error(error);
-        res.status(500).send('Server error');
-    }
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Our Journey Migrating Dashboards to the DHP Cloud (Part 2 of 2)
-
-Introduction:
-After successfully migrating our first dashboard to the DHP Cloud and reaping the benefits, our team was ready to take the next big step—getting our own domain and setting up our Cranker router. This part of our journey would further streamline our DevOps processes and enhance our application's accessibility.
-
-The Next Phase:
-With the initial POC behind us, we were excited to embark on a new challenge. The goal was clear: establish our own domain and onboard our Cranker router, a critical piece of the DHP ecosystem that would allow us to manage our applications more efficiently.
-
-Smooth Onboarding Thanks to Expert Guidance:
-Thanks to Robert Dann's expertise in Cranker as a service, our transition was smoother than expected. We were the first team to onboard using this new setup, and the process was straightforward:
-
-Repository Setup: We started by creating a stash repo in the RPP project with our project name.
-Cranker Router Deployment: Next, we configured and deployed a Cranker router using environmental variables in Relto, simplifying the connection to our applications.
-Domain Registration: We then registered a new domain with a CNAME record pointing to our MSS domain, ensuring seamless connectivity.
-Security Measures: The setup included an SSL certificate, bolstering our platform's security.
-UAT and Beyond:
-While we have only tested this setup in UAT, the production phase is well underway. For those curious about how to connect an app to this new Cranker router, we have provided a helpful GitHub project.
-
-Helpful Resources:
-To assist others in their DHP onboarding process, here are some useful links:
-
-DHP Homepage
-Access Requests
-RPP Repo
-Restabuild URL
-UAT Release Schedulers
-Service Status Monitors
-PGMaker2 Prod DB Request Repo
-Prod Release Schedulers
-DB Monitor
-Secrets Manager Service
-SSHD
-DSD
-Cost Monitor
-Conclusion:
-Our journey with DHP continues to be a transformative experience for our team. We encourage everyone to explore DHP services to see how they can benefit their projects.
-
-Stay tuned for more updates on our DHP adventures!

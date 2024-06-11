@@ -140,26 +140,13 @@ CREATE INDEX idx_metric_values_dimensions ON metric_values USING gin (dimensions
 CREATE INDEX idx_metric_details_metric_name ON metric_details (metric_name);
 
 -- Views
-
--- Views
 CREATE VIEW vw_org_hierarchy AS(
 SELECT child.org_id, child.parent_org_id, child_detail.level , parent.org_name AS parent_name, child_detail.org_name
 FROM org_hierarchy AS child
 JOIN org_details AS parent ON child.parent_org_id = parent.org_id 
 JOIN org_details AS child_detail ON child.org_id = child_detail.org_id 
 WHERE child.soft_deleted = FALSE)
-UNUION ( 
--- Selects all where there is no parent_org_id (NULL) 
-SELECT 
-child.org_id, 
-child.parent_org_id, 
-child_detail.level, 
-NULL AS parent_name, -- No parent 
-child_detail.org_name 
-FROM org_hierarchy AS child 
-JOIN org_details AS child_detail ON child.org_id = child_detail.org_id 
-WHERE child.soft_deleted = FALSE AND child.parent_org_id IS NULL 
-); 
+UNION ( -- Selects orgs where level is 'gbgf' and org_id is not in org_hierarchy SELECT org_details.org_id, NULL AS parent_org_id, org_details.level, NULL AS parent_name, org_details.org_name FROM org_details LEFT JOIN org_hierarchy ON org_details.org_id = org_hierarchy.org_id WHERE org_details.soft_deleted = FALSE AND org_details.level = 'gbgf' AND org_hierarchy.org_id IS NULL );
 
 
 CREATE VIEW vw_latest_metric_values AS

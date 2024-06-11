@@ -1,11 +1,54 @@
-function isPackageAvailable(packageName) {
-  try {
-    require.resolve(packageArguments);
-    return true; // The package is installed and can be resolved
-  } catch (error) {
-    return false; // The package is not installed
-  }
-}
+
+CREATE TABLE org_details (
+    org_id SERIAL PRIMARY KEY,
+    org_name VARCHAR(50) NOT NULL,    
+    level VARCHAR(50) CHECK (level IN ('gbgf', 'sl', 'org level 8')),
+    last_update_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    soft_deleted BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE org_hierarchy (
+    org_id INT NOT NULL,
+    parent_org_id INT,
+    org_position_ui INT DEFAULT 0,
+    last_update_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    soft_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (org_id) REFERENCES org_details (org_id),
+    FOREIGN KEY (parent_org_id) REFERENCES org_details (org_id)
+);
+
+
+CREATE TABLE metric_details (
+    metric_id SERIAL PRIMARY KEY,
+    parent_metric_id INT,
+    metric_name VARCHAR(255) NOT NULL,
+    precision INT,
+    is_percentage BOOLEAN,
+    description TEXT,
+    valid_dimensions TEXT[] NOT NULL,  -- Array of strings
+    rounding_logic VARCHAR(5),
+    soft_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (parent_metric_id) REFERENCES metric_details (metric_id)
+);
+
+CREATE TABLE metric_values (
+    org_id INT NOT NULL,
+    metric_id INT NOT NULL,
+    month_year DATE NOT NULL,
+    value NUMERIC NOT NULL,
+    last_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    dimensions JSONB NOT NULL,  -- Storing JSON data
+    value_type VARCHAR(50) CHECK (value_type IN ('actual', 'baseline', 'okr', 'target')),
+    soft_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (org_id) REFERENCES org_details (org_id),
+    FOREIGN KEY (metric_id) REFERENCES metric_details (metric_id)
+);
+
+
+
+
+
+
 
 
 

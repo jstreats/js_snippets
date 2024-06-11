@@ -1,3 +1,46 @@
+INSERT INTO org_details (org_name, level) VALUES
+('Wealth & Personal Banking IT', 'gbgf'),
+('Retail Banking & StrategyTech', 'sl'),
+('GPBW and AMG IT', 'sl'),
+('Enterprise Technology', 'gbgf'),
+('Cross Functions Technology', 'sl'),
+('Finance Technology', 'sl');
+
+
+-- Assume org_id is assigned sequentially as 1 to 6
+INSERT INTO org_hierarchy (org_id, parent_org_id) VALUES
+(2, 1),  -- Retail Banking under Wealth & Personal Banking
+(3, 1),  -- GPBW and AMG under Wealth & Personal Banking
+(5, 4),  -- Cross Functions under Enterprise Technology
+(6, 4);  -- Finance under Enterprise Technology
+
+
+INSERT INTO metric_details (metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic) VALUES
+('Release Frequency', 0, FALSE, 'The frequency of deployment to production.', '{"All"}', 'ROUND'),
+('Lead Time to Deploy', 2, FALSE, 'The amount of time it takes to deploy a new release.', '{"All"}', 'ROUND'),
+('Incidents', 0, FALSE, 'Number of incidents recorded.', '{"All"}', 'ROUND'),
+('Mean Time to Resolve', 2, FALSE, 'Average time taken to resolve incidents.', '{"All"}', 'CEIL');
+
+
+-- Assume metric_id is assigned sequentially as 1 to 4
+INSERT INTO metric_values (org_id, metric_id, month_year, value, dimensions, value_type) VALUES
+(1, 1, '2024-06-01', 30, '{"environment": "production"}', 'actual'),
+(1, 2, '2024-06-01', 2.5, '{"environment": "production"}', 'actual'),
+(1, 3, '2024-06-01', 5, '{"environment": "production"}', 'actual'),
+(1, 4, '2024-06-01', 4.0, '{"environment": "production"}', 'actual'),
+(4, 1, '2024-06-01', 45, '{"environment": "production"}', 'actual'),
+(4, 2, '2024-06-01', 1.5, '{"environment": "production"}', 'actual'),
+(4, 3, '2024-06-01', 3, '{"environment": "production"}', 'actual'),
+(4, 4, '2024-06-01', 3.5, '{"environment": "production"}', 'actual');
+
+![Uploading image.png…]()
+
+
+
+
+
+
+
 app.get('/api/orgHierarchy', async (req, res) => {
     try {
         const result = await db.query("SELECT * FROM get_org_hierarchy();");

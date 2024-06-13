@@ -1,23 +1,26 @@
- try {
-    // Get the file's contents from the repository
-    const response = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-      owner,
-      repo,
-      path
-    });
+-- First, insert the parent metrics
+INSERT INTO metric_details (metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic)
+VALUES
+('Disruptive Free Change - T0 & T1', 2, FALSE, 'Measures the disruptive free changes for T0 and T1 tiers.', ARRAY['Date', 'Team'], '0.00'),
+('All TPAM', 2, FALSE, 'Total TPAM metrics.', ARRAY['Date', 'Team'], '0.00'),
+('Incidents', 0, FALSE, 'Total number of incidents.', ARRAY['Date', 'Team'], '0'),
+('MTTR', 2, FALSE, 'Mean Time to Resolve incidents.', ARRAY['Date', 'Team'], '0.00'),
+('Release Frequency', 2, TRUE, 'Frequency of software releases.', ARRAY['Date', 'Team'], '0.00');
 
-    // Extract the SHA from the response
-    const fileSha = response.data.sha;
-
-    console.log(`The SHA of the file is: ${fileSha}`);
-    return fileSha;
-  } catch (error) {
-    console.error(`Error fetching file SHA: ${error}`);
-  }
-
-
-
-
+-- Get the generated metric_ids for the parent metrics
+WITH parent_ids AS (
+    SELECT metric_id FROM metric_details
+    WHERE metric_name IN ('Disruptive Free Change - T0 & T1', 'All TPAM', 'Incidents', 'MTTR', 'Release Frequency')
+)
+-- Insert child metrics with the corresponding parent_metric_id
+INSERT INTO metric_details (parent_metric_id, metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic)
+VALUES
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Disruptive Free Change - T0 & T1'), 'Disruptive Free Change - All Tiers', 2, FALSE, 'Measures the disruptive free changes for all tiers.', ARRAY['Date', 'Team'], '0.00'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'All TPAM'), 'TPAM (Cyber)', 2, FALSE, 'Total TPAM metrics for Cyber.', ARRAY['Date', 'Team'], '0.00'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), 'Incidents - All', 0, FALSE, 'Total number of all incidents.', ARRAY['Date', 'Team'], '0'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), '% Non-Incidents', 2, TRUE, 'Percentage of non-incidents.', ARRAY['Date', 'Team'], '0.00'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'MTTR'), 'MTTR (All Incidents)', 2, FALSE, 'Mean Time to Resolve all incidents.', ARRAY['Date', 'Team'], '0.00'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Release Frequency'), '% Software Releases', 2, TRUE, 'Percentage of software releases.', ARRAY['Date', 'Team'], '0.00');
 
 
 

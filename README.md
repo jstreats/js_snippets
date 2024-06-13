@@ -1,43 +1,27 @@
-
 -- First, insert the parent metrics
 INSERT INTO metric_details (metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic)
 VALUES
 ('Disruptive Free Change - T0 & T1', 2, FALSE, 'Measures the disruptive free changes for T0 and T1 tiers.', ARRAY[], 'ROUND'),
-('All TPAM', 0, FALSE, 'Total TPAM metrics.', ARRAY['Date', 'Team'], 'ROUND'),
-('Incidents', 0, FALSE, 'Total number of incidents.', ARRAY['Date', 'Team'], 'ROUND'),
-('MTTR', 2, FALSE, 'Mean Time to Resolve incidents.', ARRAY['Date', 'Team'], 'ROUND'),
-('Release Frequency', 2, TRUE, 'Frequency of software releases.', ARRAY['Date', 'Team'], 'ROUND');
+('All TPAM', 0, FALSE, 'Total TPAM metrics.', ARRAY['month_year'], 'ROUND'),
+('Incidents', 0, FALSE, 'Total number of incidents.', ARRAY['month_year'], 'ROUND'),
+('MTTR', 2, FALSE, 'Mean Time to Resolve incidents.', ARRAY['month_year'], 'ROUND'),
+('Release Frequency', 2, TRUE, 'Frequency of software releases.', ARRAY['month_year'], 'ROUND');
 
 -- Get the generated metric_ids for the parent metrics
 WITH parent_ids AS (
-    SELECT metric_id FROM metric_details
+    SELECT metric_id, metric_name FROM metric_details
     WHERE metric_name IN ('Disruptive Free Change - T0 & T1', 'All TPAM', 'Incidents', 'MTTR', 'Release Frequency')
 )
 -- Insert child metrics with the corresponding parent_metric_id
 INSERT INTO metric_details (parent_metric_id, metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic)
 VALUES
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Disruptive Free Change - T0 & T1'), 'Disruptive Free Change - All Tiers', 2, FALSE, 'Measures the disruptive free changes for all tiers.', ARRAY['Date', 'Team'], 'ROUND'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'All TPAM'), 'TPAM (Cyber)', 0, FALSE, 'Total TPAM metrics for Cyber.', ARRAY['Date', 'Team'], 'ROUND'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), 'Incidents - All', 0, FALSE, 'Total number of all incidents.', ARRAY['Date', 'Team'], 'ROUND'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), '% Non-Incidents', 2, TRUE, 'Percentage of non-incidents.', ARRAY['Date', 'Team'], 'ROUND'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'MTTR'), 'MTTR (All Incidents)', 2, FALSE, 'Mean Time to Resolve all incidents.', ARRAY['Date', 'Team'], 'ROUND'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Release Frequency'), '% Software Releases', 2, TRUE, 'Percentage of software releases.', ARRAY['Date', 'Team'], 'ROUND');
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Disruptive Free Change - T0 & T1'), 'Disruptive Free Change - All Tiers', 2, FALSE, 'Measures the disruptive free changes for all tiers.', ARRAY['month_year'], 'ROUND'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'All TPAM'), 'TPAM (Cyber)', 0, FALSE, 'Total TPAM metrics for Cyber.', ARRAY['month_year'], 'ROUND'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), 'Incidents - All', 0, FALSE, 'Total number of all incidents.', ARRAY['month_year'], 'ROUND'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), '% Non-Incidents', 2, TRUE, 'Percentage of non-incidents.', ARRAY['month_year'], 'ROUND'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'MTTR'), 'MTTR (All Incidents)', 2, FALSE, 'Mean Time to Resolve all incidents.', ARRAY['month_year'], 'ROUND'),
+((SELECT metric_id FROM parent_ids WHERE metric_name = 'Release Frequency'), '% Software Releases', 2, TRUE, 'Percentage of software releases.', ARRAY['month_year'], 'ROUND');
 
-
--- Get the generated metric_ids for the parent metrics
-WITH parent_ids AS (
-    SELECT metric_id FROM metric_details
-    WHERE metric_name IN ('Disruptive Free Change - T0 & T1', 'All TPAM', 'Incidents', 'MTTR', 'Release Frequency')
-)
--- Insert child metrics with the corresponding parent_metric_id
-INSERT INTO metric_details (parent_metric_id, metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic)
-VALUES
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Disruptive Free Change - T0 & T1'), 'Disruptive Free Change - All Tiers', 2, FALSE, 'Measures the disruptive free changes for all tiers.', ARRAY['Date', 'Team'], '0.00'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'All TPAM'), 'TPAM (Cyber)', 2, FALSE, 'Total TPAM metrics for Cyber.', ARRAY['Date', 'Team'], '0.00'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), 'Incidents - All', 0, FALSE, 'Total number of all incidents.', ARRAY['Date', 'Team'], '0'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Incidents'), '% Non-Incidents', 2, TRUE, 'Percentage of non-incidents.', ARRAY['Date', 'Team'], '0.00'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'MTTR'), 'MTTR (All Incidents)', 2, FALSE, 'Mean Time to Resolve all incidents.', ARRAY['Date', 'Team'], '0.00'),
-((SELECT metric_id FROM parent_ids WHERE metric_name = 'Release Frequency'), '% Software Releases', 2, TRUE, 'Percentage of software releases.', ARRAY['Date', 'Team'], '0.00');
 
 
 

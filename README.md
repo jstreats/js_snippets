@@ -1,3 +1,38 @@
+// Recursive function to get metrics with children
+const getMetrics = async (parentMetricId = null) => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT * FROM metric_details WHERE parent_metric_id = $1 AND soft_deleted = false',
+      [parentMetricId]
+    );
+
+    const metrics = result.rows;
+
+    for (let metric of metrics) {
+      metric.children = await getMetrics(metric.metric_id);
+    }
+
+    return metrics;
+  } finally {
+    client.release();
+  }
+};
+
+// Endpoint to get all metrics
+app.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await getMetrics();
+    res.json(metrics);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server Error');
+  }
+});
+
+
+
+
 -- First, insert the parent metrics
 INSERT INTO metric_details (metric_name, precision, is_percentage, description, valid_dimensions, rounding_logic)
 VALUES

@@ -1,3 +1,26 @@
+ try {
+    // Get the file's contents from the repository
+    const response = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+      owner,
+      repo,
+      path
+    });
+
+    // Extract the SHA from the response
+    const fileSha = response.data.sha;
+
+    console.log(`The SHA of the file is: ${fileSha}`);
+    return fileSha;
+  } catch (error) {
+    console.error(`Error fetching file SHA: ${error}`);
+  }
+
+
+
+
+
+
+
 INSERT INTO org_details (org_name, level) VALUES
 ('Wealth & Personal Banking IT', 'gbgf'),
 ('Retail Banking & StrategyTech', 'sl'),

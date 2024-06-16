@@ -181,7 +181,7 @@ main();
 
 
 
-
+___________________________________________________________________________________________________________________________________________
 app.put('/update-nicknames', async (req, res) => {
     const updates = req.body;
 
@@ -214,3 +214,172 @@ app.put('/update-nicknames', async (req, res) => {
         client.release();
     }
 });
+
+
+
+// API endpoint to get list of month_year
+app.post('/month-years', async (req, res) => {
+  const { org_ids, metric_ids } = req.body;
+
+  // Function to validate and sanitize input
+  const validateAndSanitizeInput = (input) => {
+    if (!Array.isArray(input)) {
+      throw new Error('Invalid input');
+    }
+    return input.map((item) => {
+      if (typeof item !== 'number') {
+        throw new Error('Invalid input');
+      }
+      return item;
+    });
+  };
+
+  try {
+    // Validate and sanitize inputs
+    const validOrgIds = org_ids ? validateAndSanitizeInput(org_ids) : [];
+    const validMetricIds = metric_ids ? validateAndSanitizeInput(metric_ids) : [];
+
+    // Get the current month and year, set to the first day of the current month
+    const currentMonthYear = new Date();
+    currentMonthYear.setDate(1);
+
+    // Base query
+    let query = `
+      SELECT DISTINCT month_year 
+      FROM metric_values 
+      WHERE month_year > $1
+    `;
+
+    // Parameters for the query
+    const queryParams = [currentMonthYear];
+    let paramIndex = 2;
+
+    // Add conditions for org_ids if provided
+    if (validOrgIds.length > 0) {
+      query += ` AND org_id IN (${validOrgIds.map((_, i) => `$${paramIndex++}`).join(', ')})`;
+      queryParams.push(...validOrgIds);
+    }
+
+    // Add conditions for metric_ids if provided
+    if (validMetricIds.length > 0) {
+      query += ` AND metric_id IN (${validMetricIds.map((_, i) => `$${paramIndex++}`).join(', ')})`;
+      queryParams.push(...validMetricIds);
+    }
+
+    // Finalize the query with ordering
+    query += ' ORDER BY month_year ASC';
+
+    // Execute the query
+    const result = await pool.query(query, queryParams);
+
+    // Send the result back to the client
+    res.json(result.rows.map((row) => row.month_year));
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+src/config.js
+const dbConfig = {
+  user: 'AutoQlik',
+  host: 'localhost',
+  database: 'CXODashboard_db_dev',
+  password: 'AutoClick',
+  port: 4432,
+};
+
+const cacheConfig = {
+  stdTTL: 100, // Time to live in seconds
+  checkperiod: 120, // Cache cleanup period in seconds
+};
+
+module.exports = { dbConfig, cacheConfig };
+
+
+src/cache.js
+const NodeCache = require('node-cache');
+const { cacheConfig } = require('./config');
+
+const cache = new NodeCache(cacheConfig);
+
+const getCachedResponse = (key) => {
+  return cache.get(key);
+};
+
+const setCachedResponse = (key, value) => {
+  cache.set(key, value);
+};
+
+const clearCache = () => {
+  cache.flushAll();
+};
+
+module.exports = { getCachedResponse, setCachedResponse, clearCache };
+
+
+src/database.js
+const { Pool } = require('pg');
+const { dbConfig } = require('./config');
+const { getCachedResponse, setCachedResponse } = require('./cache');
+
+const pool = new Pool(dbConfig);
+
+const originalQuery = pool.query.bind(pool);
+
+pool.query = async (text, params) => {
+  if (text.trim().toUpperCase().startsWith('SELECT')) {
+    const cacheKey = `${text}_${JSON.stringify(params)}`;
+    const cachedData = getCachedResponse(cacheKey);
+
+    if (cachedData) {
+      console.log(`Cache hit for query: ${text}`);
+      return { rows: cachedData };
+    }
+
+    console.log(`Cache miss for query: ${text}`);
+    const result = await originalQuery(text, params);
+    setCachedResponse(cacheKey, result.rows);
+    return result;
+  }
+
+  return originalQuery(text, params);
+};
+
+module.exports = { pool };
+
+
+src/routes.js
+const express = require('express');
+const { pool } = require('./database');
+const { clearCache } = require('./cache');
+
+const router = express.Router();
+
+router.get('/endpoint1', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM table1');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/endpoint2', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM table2');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/clear-cache', (req, res) => {
+  clearCache();
+  res.json({ message: 'Cache cleared successfully' });
+});
+
+module.exports = router;
+

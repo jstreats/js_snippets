@@ -171,3 +171,46 @@ async function main() {
 }
 
 main();
+
+
+
+
+
+
+
+
+
+
+
+app.put('/update-nicknames', async (req, res) => {
+    const updates = req.body;
+
+    if (!Array.isArray(updates)) {
+        return res.status(400).send({ error: 'Invalid input format. Expected an array of updates.' });
+    }
+
+    const client = await db.pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const updatePromises = updates.map(update => {
+            const { org_id, nick_name } = update;
+            if (!org_id || !nick_name) {
+                throw new Error('Invalid input data. Each update must contain org_id and nick_name.');
+            }
+
+            const query = 'UPDATE org_details SET nick_name = $1, last_update_date = CURRENT_TIMESTAMP WHERE org_id = $2';
+            return client.query(query, [nick_name, org_id]);
+        });
+
+        await Promise.all(updatePromises);
+        await client.query('COMMIT');
+        res.status(200).send({ message: 'Nicknames updated successfully.' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        res.status(500).send({ error: error.message });
+    } finally {
+        client.release();
+    }
+});

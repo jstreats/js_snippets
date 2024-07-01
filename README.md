@@ -1,3 +1,88 @@
+
+async function processTables() {
+
+  // List of table names
+  const tableNames = ['table1', 'table2', 'table3'];
+
+  // Get current year in YY format
+  const currentYear = new Date().getFullYear().toString().slice(-2);
+
+  try {
+
+    for (const table of tableNames) {
+      // Query to get distinct updated_on values that match the condition
+      const query = `
+        SELECT DISTINCT updated_on
+        FROM ${table}
+        WHERE month_year LIKE '%-${currentYear}' AND position('-' in month_year) = 4
+        ORDER BY updated_on DESC
+      `;
+
+      const res = await pool.query(query); // Execute the query
+
+      if (res.rows.length > 1) { // If there are multiple distinct updated_on values
+
+        let htmlBody = '<html><body>'; // Initialize the HTML body
+        for (let i = 1; i < res.rows.length; i++) {
+          const updatedOn = res.rows[i].updated_on;
+
+          // Query to get all rows with the specific updated_on value
+          const dataQuery = `
+            SELECT *
+            FROM ${table}
+            WHERE updated_on = '${updatedOn}'
+            ORDER BY updated_on DESC
+          `;
+
+          const dataRes = await pool.query(dataQuery); // Execute the data query
+
+          if (dataRes.rows.length > 0) {
+            // Create HTML table for the rows
+            htmlBody += `<h3>Table: ${table} - Updated On: ${updatedOn}</h3>`;
+            htmlBody += '<table border="1"><tr>';
+
+            // Add table headers
+            for (const key in dataRes.rows[0]) {
+              htmlBody += `<th>${key}</th>`;
+            }
+
+            htmlBody += '</tr>';
+
+            // Add table rows
+            dataRes.rows.forEach(row => {
+              htmlBody += '<tr>';
+              for (const key in row) {
+                htmlBody += `<td>${row[key]}</td>`;
+              }
+              htmlBody += '</tr>';
+            });
+
+            htmlBody += '</table>';
+          }
+        }
+
+        htmlBody += '</body></html>'; // Close the HTML body
+
+        // Send the email
+        send_email('manan.kalpesh.shah@hsbc.co.in', `Updated on seems to be wrong for ${table}.`, htmlBody);
+      }
+    }
+
+
+  } catch (err) {
+    console.error('Error executing query', err.stack);
+  } 
+}
+
+
+
+
+
+
+
+
+
+
 -- Create the org_details table
 CREATE TABLE IF NOT EXISTS org_details (
     org_id  BIGINT PRIMARY KEY DEFAULT (floor(extract(epoch from clock_timestamp()) * 1000) - 1704067200000),

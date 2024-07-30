@@ -1,0 +1,10 @@
+1. Given the recent CrowdStrike incident, our team learnt that our team lacks the capability to self-restart servers despite the provision available in the ITSP portal. Additionally, switching to our DR backup was not feasible within a reasonable time frame because we needed help from the Windows team, which was busy fixing time-critical services. This incident is rare and it is important to learn from such events. 
+Given that you interact with so many pods, What are the top learnings from this incident across various pods, and how can we improve our disaster recovery processes and automated recovery capabilities?
+(Not gonna say just included in email)
+I have a few really good suggestions that I will blog about but we all know that they will be forgotten.
+For example should we have major incidents flag in itsp when checked by a super admin we can give a few important privileged to ITSOs that they usually don't have. Reboot privilege for example.
+
+2. Why do we treat only infrastructure issues as disasters. In today's day and age I feel software disasters do exists as well. The recent crowdstrike incident, although thankfully recoverable, could have been an OS wipe or a cyber attack that encrypts the content. A software issue can affect both live and disaster servers simultaneously. Bankwide How do we strategize for software disasters? For example, we can have a software Dr activity as well? 
+Daily snapshots of all our drives can help?
+3. On a seperate topic, I just got to know yesterday that incidents are anything a pod spends time on due to an issue reported, not necessarily something that needs a fix.
+Currently most incidents are being marked as cancelled if no change is required. With our aggressive push on reducing incidents how do we culturally drive to make sure that pods mark these as incidents that they did not mark earlier?  Should we require teams to provide justification for marking an incident as cancelled, or do we need another version of the incident metric?

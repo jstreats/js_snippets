@@ -1,0 +1,62 @@
+doctype html
+html
+  head
+    meta(charset="UTF-8")
+    meta(http-equiv="X-UA-Compatible" content="IE=edge")
+    meta(name="viewport" content="width=device-width, initial-scale=1")
+    title AutoQlik - Regression Test
+    link(rel="stylesheet" href="/css/bootstrap.min.css")
+    link(rel="stylesheet" href="/css/font-awesome.min.css")
+    link(rel="stylesheet" href="/css/style.css")
+
+  body
+    .container.p-5.mt-5
+      .col
+        h3.text-center.mb-4 AutoQlik Regression Test
+        p.text-muted Please enter the Jira number and select the appropriate options.
+
+        form#regressionForm(action="#" method="get")
+          .form-group
+            label(for="jiraNumber") Enter Jira Number:
+            input#jiraNumber.form-control(type="text" name="jiraNumber" placeholder="Enter Jira Number" required)
+          br
+
+          .form-group
+            input#regressionDone(type="checkbox" name="regressionDone")
+            label(for="regressionDone") Regression test already done?
+          br
+
+          .form-group#radioGroup
+            label Select Option:
+            div
+              input#dmd(type="radio" name="testType" value="DMD" checked)
+              label(for="dmd") DMD
+            div
+              input#kci(type="radio" name="testType" value="KCI")
+              label(for="kci") KCI
+          br
+
+          button.btn.btn-primary.btn-block(type="submit") Start Regression Test
+
+    script(src="/js/jquery-3.5.1.min.js")
+    script(src="/js/bootstrap.bundle.min.js")
+    script.
+      $(document).ready(function() {
+        $('#regressionDone').change(function() {
+          if ($(this).is(':checked')) {
+            $('#radioGroup').hide();
+          } else {
+            $('#radioGroup').show();
+          }
+        });
+
+        $('#regressionForm').submit(function(event) {
+          event.preventDefault(); // Prevent default form submission
+          
+          if ($('#regressionDone').is(':checked')) {
+            window.location.href = '/regressionTestDone';
+          } else {
+            window.location.href = '/regressionTestSuccess';
+          }
+        });
+      });

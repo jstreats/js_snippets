@@ -1,42 +1,21 @@
-const { param, validationResult } = require('express-validator');
+// Function to check if a variable is a valid BigInt
+function isValidBigInt(value) {
+    return typeof value === 'bigint';
+}
 
-// Custom middleware function
-const validateParams = [
-  // Validate org_id - should be a valid BIGINT
-  param('org_id')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('org_id must be a valid BIGINT')
-    .customSanitizer(value => parseInt(value, 10))
-    .custom((value, { req }) => {
-      if (value && isNaN(value)) {
-        throw new Error('Invalid org_id format');
-      }
-      return true;
-    }),
+// Function to check if a variable is a valid sanitized PostgreSQL parameter for the year in the format 20yy
+function isValidYear(year) {
+    const yearRegex = /^20\d{2}$/;
+    return yearRegex.test(year);
+}
 
-  // Validate month_year - should be in the format yyyy-mm-dd
-  param('month_year')
-    .optional()
-    .isDate({ format: 'yyyy-mm-dd', strictMode: true })
-    .withMessage('month_year must be in the format yyyy-mm-dd'),
+// Function to check if a variable is a valid sanitized PostgreSQL parameter for the month-year in the format yyyy-mm-dd
+function isValidMonthYear(date) {
+    const monthYearRegex = /^\d{4}-(0[1-9]|1[0-2])-\d{2}$/;
+    return monthYearRegex.test(date);
+}
 
-  // Validate year - should be in the format yyyy
-  param('year')
-    .optional()
-    .isInt({ min: 1000, max: 9999 })
-    .withMessage('year must be in the format yyyy'),
-
-  // Middleware to check for validation errors
-  (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        errors: errors.array()
-      });
-    }
-    next();
-  }
-];
-
-module.exports = validateParams;
+// Example Usage
+console.log(isValidBigInt(12345678901234567890n)); // Output: true
+console.log(isValidYear('2024')); // Output: true
+console.log(is

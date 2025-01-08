@@ -1,52 +1,45 @@
 const fs = require('fs');
+const jsPDF = require('jspdf');
 const path = require('path');
-const pdf = require('pdf-creator-node');
-const moment = require('moment');
 
-const folderPath = 'path/to/folder';
-const outputFolderPath = 'path/to/output/folder';
+const mergeRegressionEvidenceToPdf = (folderPath) => {
+  // Get all the PNG files in the folder
+  const files = fs.readdirSync(folderPath).filter(file => file.endsWith('.png'));
 
-// Get all the PNG files in the folder
-const files = fs.readdirSync(folderPath);
+  // Create a new PDF document
+  const doc = new jsPDF();
 
-// Create a new PDF document
-const doc = new pdf.PDFDocument({
-  margin: 50,
-  size: 'A4',
-});
+  // Loop through the files and add them to the PDF
+  files.forEach((file, index) => {
+    // Read the file
+    const imageData = fs.readFileSync(path.join(folderPath, file));
 
-// Add each file to the PDF document
-files.forEach((file, index) => {
-  // Get the file name
-  const fileName = path.basename(file, '.png');
+    // Add the image to the PDF
+    doc.addImage(imageData, 'PNG', 10, 10, 180, 180);
 
-  // Create a new page in the PDF document
-  doc.addPage();
+    // Add the filename to the page
+    doc.setFontSize(12);
+    doc.text(file, 10, 200);
 
-  // Add the image to the page
-  doc.image(path.join(folderPath, file), {
-    x: 50,
-    y: 50,
-    width: 500,
-    height: 500,
+    // Add a new page
+    doc.addPage();
   });
 
-  // Add the file name to the page
-  doc.text(fileName, {
-    x: 50,
-    y: 600,
-    fontSize: 12,
-  });
-});
+  // Get the current UTC time
+  const now = new Date();
+  const utcTime = now.toISOString().replace(/[:.]/g, '-');
 
-// Save the PDF document
-const outputFileName = `output-${moment().format('YYYY-MM-DD HH:mm')}.pdf`;
-const outputFilePath = path.join(outputFolderPath, outputFileName);
-doc.save(outputFilePath, (err) => {
-  if (err) {
-    console.error(err);
-    return;
-  }
+  // Create a subfolder with the current UTC time
+  const subfolderPath = path.join(folderPath, utcTime);
+  fs.mkdirSync(subfolderPath);
 
-  console.log(`The PDF file has been saved to ${outputFilePath}`);
-});
+  // Save the PDF file to the subfolder
+  const fileName = `images-${utcTime}.pdf`;
+  doc.save(path.join(subfolderPath, fileName));
+
+  // Return the file name
+  return fileName;
+};
+
+module.exports = mergeRegressionEvidenceToPdf; 
+ 
